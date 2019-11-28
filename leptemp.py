@@ -57,13 +57,13 @@ def raw_to_8bit(data):
     # return cv2.applyColorMap(img, cv2.COLORMAP_JET)
     return img
 
-def imgShow(data):
-    data = cv2.resize(data[:,:], (640, 480))
-    minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
-    img = raw_to_8bit(data)
-    display_temperature(img, minVal, minLoc, (0, 0, 255))
-    display_temperature(img, maxVal, maxLoc, (255, 0, 0))
-    return img
+# def imgShow(data):
+#     data = cv2.resize(data[:,:], (640, 480))
+#     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
+#     img = raw_to_8bit(data)
+#     display_temperature(img, minVal, minLoc, (0, 0, 255))
+#     display_temperature(img, maxVal, maxLoc, (255, 0, 0))
+#     return img
 
 def getImage(data):
     data = cv2.resize(data[:,:], (640, 480))
@@ -150,6 +150,18 @@ def display_temperature(img, val_k, loc, color):
     cv2.line(img, (x - 2, y), (x + 2, y), color, 1)
     cv2.line(img, (x, y - 2), (x, y + 2), color, 1)
 
+def add_line(self, coords, t):
+    line = "%s" % self.index
+    x,y = coords
+    self.list_ctrl.InsertItem(self.index, line)
+    self.list_ctrl.SetItem(self.index, 1, str(x)+', '+str(y))
+    self.list_ctrl.SetItem(self.index, 2, str(ktoc(t)))
+    self.index += 1
+
+def eraseLine(self, index):
+    self.list_ctrl.DeleteItem(index)
+
+
 class MyFrame(wx.Frame):
     def __init__(self, parent, ID, title):
         wx.Frame.__init__(self, parent, ID, title, size=(1010, 500))
@@ -158,6 +170,7 @@ class MyFrame(wx.Frame):
         self.currentImage=[]
         self.currentData=[]
 
+        # print("hah")
         # main_panel es el panel principal(la ventana entera)
         # panel1 es la izqda, panel 2 la derecha.
         main_panel = wx.Panel(self)
@@ -215,20 +228,29 @@ class MyFrame(wx.Frame):
         box23.Add(self.bbtn, 0, wx.ALIGN_CENTER)
         # box23 = wx.BoxSizer(wx.HORIZONTAL)
 
-        listPanel = wx.Panel(panel3, -1)
-        listPanel.height = 200
-        listPanel.SetBackgroundColour("#FFFFFF")
+      
+
+        self.index = 0
+ 
+        self.list_ctrl = wx.ListCtrl(panel3, wx.ID_ANY, size=(220,-1),
+                         style=wx.LC_REPORT | wx.BORDER_SUNKEN
+                         )
+        self.list_ctrl.InsertColumn(0, 'id', width=40)
+        self.list_ctrl.InsertColumn(1, 'center', width=90)
+        self.list_ctrl.InsertColumn(2, 'T en C', width=90)
+
+
+
 
 
         # box33.Add(box23, 1, wx.ALIGN_CENTER)
-        box33.Add(listPanel, 1, wx.EXPAND | wx.ALL, 5)
+        box33.Add(self.list_ctrl, 3, wx.EXPAND | wx.ALL, 5)
         box33.Add(box22, 1, wx.ALIGN_CENTER)
         box33.Add(box23, 1, wx.ALIGN_CENTER)
 
 
         panel2.SetSizer(box3)
         panel3.SetSizer(box33)
-        print("hah")
 
 
 
@@ -236,20 +258,26 @@ class MyFrame(wx.Frame):
         self.videobmp.Bind(wx.EVT_LEFT_DOWN, self.getCoordinates)
 
     def undoCord(self, event):
-        print(len(self.coordsSaved),len(self.savedCrops) )
+        size = len(self.coordsSaved)
         if len(self.coordsSaved)==len(self.savedCrops) and len(self.coordsSaved)>0:
+            eraseLine(self, size-1)
+            self.index-=1
             self.coordsSaved = self.coordsSaved[:-1]
             self.savedCrops = self.savedCrops[:-1]
             self.currentImage = getImage(self.currentData)
             if self.currentImage != []:
                 for i in self.coordsSaved:
-                    print(i)        
+                    # print(i)        
                     cv2.circle(self.currentImage, i, 20, (0,0,255), 3)
                 width, height = 640, 480
                 image = wx.Image(width,height)
                 image.SetData(self.currentImage)
                 self.videobmp.SetBitmap(wx.Bitmap(image))
                 self.Refresh()
+        else:
+            print("ERROR FATAL")
+            # print(len(self.coordsSaved), len(self.savedCrops))
+            exit(1)
 
             
     def save_ts(self, event):
@@ -280,11 +308,19 @@ class MyFrame(wx.Frame):
             self.videobmp.SetBitmap(wx.Bitmap(image))
             self.Refresh()
             x,y = getLocRaw((x,y))
-            csv, crop=getCrop(self.currentData, x, y)
+            try:
+                csv, crop=getCrop(self.currentData, x, y)
+            except:
+                # print(len(self.coordsSaved), len(self.savedCrops))
+                self.coordsSaved = self.coordsSaved[:-1]
             if crop.shape != (11,11):
                 print('circulo fuera de la imagen!')
-
-            self.savedCrops.append(csv)
+            # elif len(self.coordsSaved)==len(self.savedCrops):
+            #     print(len(self.coordsSaved), len(self.savedCrops))
+            #     self.coordsSaved = self.coordsSaved[:-1]
+            else:
+                self.savedCrops.append(csv)
+                add_line(self, (x,y), self.currentData[x][y])
 
         
     def screenshot(self, event):
@@ -355,26 +391,13 @@ class MyFrame(wx.Frame):
         finally:
             libuvc.uvc_exit(ctx)
 
-    # def capture(self, event):
-    #     self.data = q.get(True, 500)
-    #     if self.data is None:
-    #         print("no hay camera feed")
-    #     else:         
-    #         img = getImage(self.data)
-    #         width, height = 640, 480
-    #         image = wx.Image(width,height)
-    #         image.SetData(img)
-    #         self.videobmp.SetBitmap(wx.Bitmap(image))
-    #         self.Refresh()
 
     
 
 class ButtonPanel(wx.Panel):
     def __init__(self, parent, ID):
         wx.Panel.__init__(self, parent, ID, size=(120, 480))
-
-
-        
+       
 
 if __name__ == "__main__":
     app = wx.App()
