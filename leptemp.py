@@ -5,6 +5,7 @@ from uvctypes import *
 import time
 import numpy as np
 from datetime import datetime
+from zipfile import ZipFile
 
 try:
     from queue import Queue
@@ -55,7 +56,7 @@ def raw_to_8bit(data):
     img = cv2.cvtColor(np.uint8(data), cv2.COLOR_GRAY2RGB)
     # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) # convert it to hsv
     # return cv2.applyColorMap(img, cv2.COLORMAP_JET)
-    return img
+    return cv2.applyColorMap(img, cv2.COLORMAP_RAINBOW)
 
 # def imgShow(data):
 #     data = cv2.resize(data[:,:], (640, 480))
@@ -129,17 +130,32 @@ def getCrop(imageData, x, y):
             else:
                 csv.append(csq[i][j])
 
-            
-
     return csv, csq
 
-def saveCsv(csv):
+def zipResults(names):
+    # img = raw_to_8bit(data)
     now = datetime.now()
-    dt_string = now.strftime("%d-%m-%Y_%H:%M:%S:%f")
+    zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
+    with ZipFile(zipString,'w') as z:
+        for i in names:
+            z.write(i)
+
+
+def saveCsv(csv):
+    cstring = "circulos"
     csv = np.mat(csv)
-    with open(dt_string+'.csv','wb') as f:
+    with open(cstring+'.csv','wb') as f:
         for i in csv:
             np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
+        f.close()
+
+def saveData(data):
+    data = ktoc(data)
+    cstring = "dataCompleta"
+    csv = np.mat(data)
+    with open(cstring+'.csv','wb') as f:
+        for i in csv:
+            np.savetxt(f, np.array(i), fmt='%.3f', delimiter=' ')
         f.close()
 
 
@@ -282,7 +298,12 @@ class MyFrame(wx.Frame):
             
     def save_ts(self, event):
         if len(self.savedCrops) > 0:
+            path = './foto.tiff'
+            # path = './fotoCirculos.tiff'
+            cv2.imwrite(path, self.currentImage)
+            saveData(self.currentData)
             saveCsv(self.savedCrops)
+            zipResults(['foto.tiff', 'circulos.csv','dataCompleta.csv'])
             self.currentImage = getImage(self.currentData)
             width, height = 640, 480
             image = wx.Image(width,height)
@@ -291,6 +312,10 @@ class MyFrame(wx.Frame):
             self.Refresh()
             self.coordsSaved=[]
             self.savedCrops=[]
+            for i in range(self.index):
+                self.index-=1
+                eraseLine(self, self.index)
+
         else:
             print("no hay mano bro")
 
