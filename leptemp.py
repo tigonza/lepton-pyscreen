@@ -54,17 +54,8 @@ def raw_to_8bit(data):
     cv2.normalize(data, data, 0, 65535, cv2.NORM_MINMAX)
     np.right_shift(data, 8, data)
     img = cv2.cvtColor(np.uint8(data), cv2.COLOR_GRAY2RGB)
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) # convert it to hsv
-    # return cv2.applyColorMap(img, cv2.COLORMAP_JET)
-    return cv2.applyColorMap(img, cv2.COLORMAP_RAINBOW)
-
-# def imgShow(data):
-#     data = cv2.resize(data[:,:], (640, 480))
-#     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
-#     img = raw_to_8bit(data)
-#     display_temperature(img, minVal, minLoc, (0, 0, 255))
-#     display_temperature(img, maxVal, maxLoc, (255, 0, 0))
-#     return img
+    img = cv2.applyColorMap(img, cv2.COLORMAP_JET)
+    return img
 
 def getImage(data):
     data = cv2.resize(data[:,:], (640, 480))
@@ -72,6 +63,7 @@ def getImage(data):
     img = raw_to_8bit(data)
     display_temperature(img, minVal, minLoc, (0, 0, 255))
     display_temperature(img, maxVal, maxLoc, (255, 0, 0))
+    # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     return img
 
 def getCrop(imageData, x, y):
@@ -141,11 +133,19 @@ def zipResults(names):
             z.write(i)
 
 
-def saveCsv(csv):
+def saveCsv(csv, temps):
     cstring = "circulos"
     csv = np.mat(csv)
+    c=0
+    res=[]
+    # mean = np.mean(csv)
+    for i in csv:
+        line=[c, temps[c], np.mean(i)]
+        res.append(line)
+        c+=1
+
     with open(cstring+'.csv','wb') as f:
-        for i in csv:
+        for i in np.mat(res):
             np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
         f.close()
 
@@ -184,9 +184,10 @@ class MyFrame(wx.Frame):
         self.coordsSaved=[]
         self.savedCrops=[]
         self.currentImage=[]
+        self.stream = True
         self.currentData=[]
+        self.pointTemps=[]
 
-        # print("hah")
         # main_panel es el panel principal(la ventana entera)
         # panel1 es la izqda, panel 2 la derecha.
         main_panel = wx.Panel(self)
@@ -202,7 +203,6 @@ class MyFrame(wx.Frame):
         image = wx.Image(640, 480)
         imageBitmap = wx.Bitmap(image)
         self.videobmp = wx.StaticBitmap(self.streamPanel, wx.ID_ANY, imageBitmap)
-        # self.streamPanel.bitmap1 = wx.StaticBitmap(self.streamPanel, -1, img, (0, 0))
         
         panel1.SetBackgroundColour("#000000")
         panel2.SetBackgroundColour("#e4e4e4")
@@ -210,9 +210,10 @@ class MyFrame(wx.Frame):
         panel3.SetBackgroundColour("#e4e4e4")
 
         
+        self.strBtn = wx.Button(panel2, -1, "video")
+        self.strBtn.Bind(wx.EVT_BUTTON,self.s_stream)
         
-        
-        self.btn = wx.Button(panel2, -1, "Tomar foto")
+        self.btn = wx.Button(panel2, -1, "tomar foto")
         self.btn.Bind(wx.EVT_BUTTON,self.screenshot)
 
         self.button = wx.Button(panel3, -1, "guardar temps")
@@ -220,7 +221,11 @@ class MyFrame(wx.Frame):
                     
         self.bbtn = wx.Button(panel3, -1, "deshacer circulo")
         self.bbtn.Bind(wx.EVT_BUTTON,self.undoCord)
+
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onTimer)
         
+        self.timer.Start(1000/9)
 
         sbox.Add(self.streamPanel, 1,wx.EXPAND | wx.ALL, 10)
         panel1.SetSizer(sbox)
@@ -237,12 +242,12 @@ class MyFrame(wx.Frame):
         box23 = wx.BoxSizer(wx.HORIZONTAL)
         box33 = wx.BoxSizer(wx.VERTICAL)
         
+        box2.Add(self.strBtn, 0, wx.ALIGN_CENTER)
         box2.Add(self.btn, 0, wx.ALIGN_CENTER)
         box3.Add(box2, 1, wx.ALIGN_CENTER)
 
         box22.Add(self.button, 0, wx.ALIGN_CENTER)
         box23.Add(self.bbtn, 0, wx.ALIGN_CENTER)
-        # box23 = wx.BoxSizer(wx.HORIZONTAL)
 
       
 
@@ -259,7 +264,6 @@ class MyFrame(wx.Frame):
 
 
 
-        # box33.Add(box23, 1, wx.ALIGN_CENTER)
         box33.Add(self.list_ctrl, 3, wx.EXPAND | wx.ALL, 5)
         box33.Add(box22, 1, wx.ALIGN_CENTER)
         box33.Add(box23, 1, wx.ALIGN_CENTER)
@@ -273,46 +277,58 @@ class MyFrame(wx.Frame):
         main_panel.SetSizer(box)
         self.videobmp.Bind(wx.EVT_LEFT_DOWN, self.getCoordinates)
 
+    def s_stream(self, event):
+        self.stream = True
+
+
     def undoCord(self, event):
         size = len(self.coordsSaved)
-        if len(self.coordsSaved)==len(self.savedCrops) and len(self.coordsSaved)>0:
-            eraseLine(self, size-1)
-            self.index-=1
-            self.coordsSaved = self.coordsSaved[:-1]
-            self.savedCrops = self.savedCrops[:-1]
-            self.currentImage = getImage(self.currentData)
-            if self.currentImage != []:
-                for i in self.coordsSaved:
-                    # print(i)        
-                    cv2.circle(self.currentImage, i, 20, (0,0,255), 3)
-                width, height = 640, 480
-                image = wx.Image(width,height)
-                image.SetData(self.currentImage)
-                self.videobmp.SetBitmap(wx.Bitmap(image))
-                self.Refresh()
+        if len(self.coordsSaved)==len(self.savedCrops):
+            if not self.stream:
+                if len(self.coordsSaved)!=0:
+                    eraseLine(self, size-1)
+                    self.index-=1
+                    self.coordsSaved = self.coordsSaved[:-1]
+                    self.savedCrops = self.savedCrops[:-1]
+                    self.pointTemps = self.pointTemps[:-1]
+                    self.currentImage = getImage(self.currentData)
+                    if self.currentImage != []:
+                        for i in self.coordsSaved:
+                            # print(i)        
+                            cv2.circle(self.currentImage, i, 15, (0,0,0), 3)
+                        width, height = 640, 480
+                        image = wx.Image(width,height)
+                        img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+                        image.SetData(img)
+                        self.videobmp.SetBitmap(wx.Bitmap(image))
+                        self.Refresh()
+    
         else:
             print("ERROR FATAL")
-            # print(len(self.coordsSaved), len(self.savedCrops))
+            print(len(self.coordsSaved), len(self.savedCrops))
             exit(1)
 
             
     def save_ts(self, event):
         if len(self.savedCrops) > 0:
             path = './foto.tiff'
-            # path = './fotoCirculos.tiff'
+            # cv2.imwrite(path, cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR))
             cv2.imwrite(path, self.currentImage)
             saveData(self.currentData)
-            saveCsv(self.savedCrops)
+            saveCsv(self.savedCrops, self.pointTemps)
             zipResults(['foto.tiff', 'circulos.csv','dataCompleta.csv'])
             self.currentImage = getImage(self.currentData)
             width, height = 640, 480
             image = wx.Image(width,height)
-            image.SetData(self.currentImage)
+            img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+            image.SetData(img)
             self.videobmp.SetBitmap(wx.Bitmap(image))
             self.Refresh()
             self.coordsSaved=[]
             self.savedCrops=[]
-            for i in range(self.index):
+            self.pointTemps=[]
+
+            for _ in range(self.index):
                 self.index-=1
                 eraseLine(self, self.index)
 
@@ -325,18 +341,18 @@ class MyFrame(wx.Frame):
         # ss = str(x)+' '+str(y)
         img = self.currentImage
         if img != []:    
-            cv2.circle(img, (x,y), 20, (0,0,255), 3)
+            cv2.circle(img, (x,y), 15, (0,0,0), 3)
             self.coordsSaved.append((x,y))
             width, height = 640, 480
             image = wx.Image(width,height)
-            image.SetData(self.currentImage)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            image.SetData(img)
             self.videobmp.SetBitmap(wx.Bitmap(image))
             self.Refresh()
             x,y = getLocRaw((x,y))
             try:
                 csv, crop=getCrop(self.currentData, x, y)
             except:
-                # print(len(self.coordsSaved), len(self.savedCrops))
                 self.coordsSaved = self.coordsSaved[:-1]
             if crop.shape != (11,11):
                 print('circulo fuera de la imagen!')
@@ -345,78 +361,47 @@ class MyFrame(wx.Frame):
             #     self.coordsSaved = self.coordsSaved[:-1]
             else:
                 self.savedCrops.append(csv)
+                self.pointTemps.append(ktoc(self.currentData[x][y]))
                 add_line(self, (x,y), self.currentData[x][y])
 
         
     def screenshot(self, event):
         self.coordsSaved = []
-        ctx = POINTER(uvc_context)()
-        dev = POINTER(uvc_device)()
-        devh = POINTER(uvc_device_handle)()
-        ctrl = uvc_stream_ctrl()
-        PTR_PY_FRAME_CALLBACK = CFUNCTYPE(None, POINTER(uvc_frame), c_void_p)(py_frame_callback)
+        self.stream=False
+        
+        if len(self.savedCrops) > 0:
+            for _ in range(self.index):
+                self.index-=1
+                eraseLine(self, self.index)
+            self.savedCrops = []
+            self.pointTemps = []
 
+        data = q.get(True, 500)
+        if data is None:
+            print("no hay camera feed")
+        else:
+            self.currentData=np.array(data)                  
+            self.currentImage = getImage(data)
+            img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+            width, height = 640, 480
+            image = wx.Image(width,height)
+            image.SetData(img)
+            self.videobmp.SetBitmap(wx.Bitmap(image))
+            self.Refresh()
 
-        # print('Enter the path where the pictures will be saved:')
-        # PATH = input()
-
-        res = libuvc.uvc_init(byref(ctx), 0)
-        if res < 0:
-            print("uvc_init error")
-            exit(1)
-
-        try:
-            res = libuvc.uvc_find_device(ctx, byref(dev), PT_USB_VID, PT_USB_PID, 0)
-            if res < 0:
-                print("uvc_find_device error")
-                exit(1)
-
-            try:
-                res = libuvc.uvc_open(dev, byref(devh))
-                if res < 0:
-                    print("uvc_open error")
-                    exit(1)
-
-                print("device opened!")
-                frame_formats = uvc_get_frame_formats_by_guid(devh, VS_FMT_GUID_Y16)
-                if len(frame_formats) == 0:
-                    print("device does not support Y16")
-                    exit(1)
-                print(frame_formats)
-                libuvc.uvc_get_stream_ctrl_format_size(devh, byref(ctrl), UVC_FRAME_FORMAT_Y16, frame_formats[0].wWidth, frame_formats[0].wHeight, int(1e7 / frame_formats[0].dwDefaultFrameInterval))
-                res = libuvc.uvc_start_streaming(devh, byref(ctrl), PTR_PY_FRAME_CALLBACK, None, 0)
-                if res < 0:
-                    print("uvc_start_streaming failed: {0}".format(res))
-                    exit(1)
-
-                data = q.get(True, 500)
-                if data is None:
-                    print("no hay camera feed")
-                else:
-                    self.currentData=np.array(data)
-                    # now = datetime.now()
-                    # dt_string = now.strftime("%d-%m-%Y_%H:%M:%S:%f")
-                    # mat = np.matrix(data)
-
-                    # with open(dt_string+'.csv','wb') as f:
-                    #     for line in mat:
-                    #         np.savetxt(f, line, fmt='%.2f', delimiter=',')
-                    #     f.close()
-                    
-                    self.currentImage = getImage(data)
-                    width, height = 640, 480
-                    image = wx.Image(width,height)
-                    image.SetData(self.currentImage)
-                    self.videobmp.SetBitmap(wx.Bitmap(image))
-                    self.Refresh()
-                    # path = '/home/tomasgonzalez/Pictures/'+'LP_'+dt_string+'.tiff'
-                    # cv2.imwrite(path, img)
-            finally:
-                libuvc.uvc_unref_device(dev)
-        finally:
-            libuvc.uvc_exit(ctx)
-
-
+    def onTimer(self, event):
+        if self.stream:
+            data = q.get(True, 500)
+            if data is None:
+                print("no hay camera feed")
+            else:
+                img = getImage(data)
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                width, height = 640, 480
+                image = wx.Image(width,height)
+                image.SetData(img)
+                self.videobmp.SetBitmap(wx.Bitmap(image))
+                self.Refresh()
     
 
 class ButtonPanel(wx.Panel):
@@ -425,9 +410,51 @@ class ButtonPanel(wx.Panel):
        
 
 if __name__ == "__main__":
-    app = wx.App()
-    frame = MyFrame(None, -1, "Lepton Screen-Shoter")
-    frame.Show()
-    app.MainLoop()
+    ctx = POINTER(uvc_context)()
+    dev = POINTER(uvc_device)()
+    devh = POINTER(uvc_device_handle)()
+    ctrl = uvc_stream_ctrl()
+    PTR_PY_FRAME_CALLBACK = CFUNCTYPE(None, POINTER(uvc_frame), c_void_p)(py_frame_callback)
 
+    res = libuvc.uvc_init(byref(ctx), 0)
+    if res < 0:
+        print("uvc_init error")
+        exit(1)
+
+    try:
+        res = libuvc.uvc_find_device(ctx, byref(dev), PT_USB_VID, PT_USB_PID, 0)
+        if res < 0:
+            print("uvc_find_device error")
+            exit(1)
+
+        try:
+            res = libuvc.uvc_open(dev, byref(devh))
+            if res < 0:
+                print("uvc_open error")
+                exit(1)
+
+            print("device opened!")
+            frame_formats = uvc_get_frame_formats_by_guid(devh, VS_FMT_GUID_Y16)
+            if len(frame_formats) == 0:
+                print("device does not support Y16")
+                exit(1)
+            print(frame_formats)
+            libuvc.uvc_get_stream_ctrl_format_size(devh, byref(ctrl), UVC_FRAME_FORMAT_Y16, frame_formats[0].wWidth, frame_formats[0].wHeight, int(1e7 / frame_formats[0].dwDefaultFrameInterval))
+            res = libuvc.uvc_start_streaming(devh, byref(ctrl), PTR_PY_FRAME_CALLBACK, None, 0)
+            if res < 0:
+                print("uvc_start_streaming failed: {0}".format(res))
+                exit(1)
+
+            data = q.get(True, 500)
+            if data is None:
+                print("no hay camera feed")   
+            app = wx.App()
+            frame = MyFrame(None, -1, "Lepton Screen-Shoter")
+            frame.Show()
+            app.MainLoop()             
+        finally:
+            libuvc.uvc_unref_device(dev)
+    finally:
+        libuvc.uvc_exit(ctx)
+    
 

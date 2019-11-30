@@ -51,9 +51,9 @@ def raw_to_8bit(data):
   print(data.shape)
   cv2.normalize(data, data, 0, 65535, cv2.NORM_MINMAX)
   np.right_shift(data, 8, data)
-  img = cv2.cvtColor(np.uint8(data), cv2.COLOR_GRAY2RGB)
-  # img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV) # convert it to hsv
-  # return cv2.applyColorMap(img, cv2.COLORMAP_HOT)
+  img = cv2.cvtColor(np.uint8(data), cv2.COLOR_GRAY2BGR)
+  img = cv2.applyColorMap(img, cv2.COLORMAP_JET)
+  # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # convert it to hsv
   return img
 
 def display_temperature(img, val_k, loc, color):
@@ -102,20 +102,19 @@ def main():
         exit(1)
       
       try:
-        counter = 3
         while True:
           data = q.get(True, 500)
           if data is None:
             break
           img = imgShow(data)
           cv2.imshow('Lepton Radiometry', img)
-          if counter > 0:
-            now = datetime.now()
-            dt_string = now.strftime("%d-%m-%Y_%H:%M:%S:%f.jpg")
-            path = '/home/tomasgonzalez/Pictures/'+'LP_'+dt_string
-            print(path)
-            cv2.imwrite(path, img)
-            counter-=1
+          # if counter > 0:
+          #   now = datetime.now()
+          #   dt_string = now.strftime("%d-%m-%Y_%H:%M:%S:%f.jpg")
+          #   path = '/home/tomasgonzalez/Pictures/'+'LP_'+dt_string
+          #   print(path)
+          #   cv2.imwrite(path, img)
+          #   counter-=1
           
           if cv2.waitKey(5) == 27:
                 break
