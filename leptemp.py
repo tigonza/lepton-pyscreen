@@ -128,7 +128,7 @@ def getCrop(imageData, x, y):
 def zipResults(names):
     # img = raw_to_8bit(data)
     now = datetime.now()
-    zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
+    zipString=now.strftime("/home/pi/Desktop/%d-%m-%Y_%H:%M:%S:%f")
     with ZipFile(zipString,'w') as z:
         for i in names:
             z.write(i)
