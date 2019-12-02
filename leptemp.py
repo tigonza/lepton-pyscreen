@@ -128,8 +128,8 @@ def getCrop(imageData, x, y):
 def zipResults(names):
     # img = raw_to_8bit(data)
     now = datetime.now()
-    # zipString=now.strftime("/home/pi/Desktop/%d-%m-%Y_%H:%M:%S:%f")
-    zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
+    zipString=now.strftime("/home/pi/Desktop/resultados/%d-%m-%Y_%H:%M:%S:%f")
+    # zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
     with ZipFile(zipString,'w') as z:
         for i in names:
             z.write(i)
@@ -160,11 +160,12 @@ def saveCsv(csv, temps):
     res=[]
     # mean = np.mean(csv)
     for i in csv:
-        line=[c, temps[c], np.mean(i)]
+        line=[c, temps[c], np.mean(i), np.max(i)]
         res.append(line)
         c+=1
 
     with open(cstring+'.csv','wb') as f:
+        f.write('index,Center,Promedio,Max\n')
         for i in np.mat(res):
             np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
         f.close()
@@ -339,6 +340,10 @@ class MyFrame(wx.Frame):
             cv2.imwrite(path, self.currentImage)
             saveData(self.currentData)
             saveCsv(self.savedCrops, self.pointTemps)
+            
+            if not os.path.exists("/home/pi/Desktop/resultados"):
+                os.makedirs("/home/pi/Desktop/resultados") 
+
             names = ['foto.tiff', 'circulos.csv','dataCompleta.csv']
             zipResults(names)
             for i in names:
