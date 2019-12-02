@@ -1,4 +1,5 @@
 import wx
+import os
 import cv2
 
 from uvctypes import *
@@ -337,7 +338,10 @@ class MyFrame(wx.Frame):
             cv2.imwrite(path, self.currentImage)
             saveData(self.currentData)
             saveCsv(self.savedCrops, self.pointTemps)
-            zipResults(['foto.tiff', 'circulos.csv','dataCompleta.csv'])
+            names = ['foto.tiff', 'circulos.csv','dataCompleta.csv']
+            zipResults(names)
+            for i in names:
+                os.remove(i)
             self.currentImage = getImage(self.currentData)
             width, height = 640, 480
             image = wx.Image(width,height)
