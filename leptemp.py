@@ -48,7 +48,7 @@ def ktoc(val):
     return (val - 27315) / 100.0
 
 def getLocRaw(coords):
-    return (coords[1]*120/480,coords[0]*160/640)
+    return (np.int(coords[1]*120/480),np.int(coords[0]*160/640))
 
 def raw_to_8bit(data):
     cv2.normalize(data, data, 0, 65535, cv2.NORM_MINMAX)
@@ -340,6 +340,8 @@ class MyFrame(wx.Frame):
         x, y=event.GetPosition()
         # ss = str(x)+' '+str(y)
         img = self.currentImage
+        crops =[]
+        csv = []
         if img != []:    
             cv2.circle(img, (x,y), 15, (0,0,0), 3)
             self.coordsSaved.append((x,y))
