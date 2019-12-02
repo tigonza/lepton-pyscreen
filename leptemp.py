@@ -132,6 +132,24 @@ def zipResults(names):
         for i in names:
             z.write(i)
 
+def drawNumbers(img, ca, int):
+    number = str(int)
+    coords = (ca[0]-8, ca[1]+8)
+    fontFace = cv2.FONT_HERSHEY_SCRIPT_SIMPLEX
+    thickness = 2  
+    # fontScale 
+    fontScale = 0.8
+    
+    # Blue color in BGR 
+    color = (0, 0, 0) 
+    
+    # Line thickness of 2 px 
+    thickness = 2
+    
+    # Using cv2.putText() method 
+    cv2.putText(img, number, coords, fontFace,fontScale, color, thickness, cv2.LINE_AA)
+
+
 
 def saveCsv(csv, temps):
     cstring = "circulos"
@@ -293,9 +311,12 @@ class MyFrame(wx.Frame):
                     self.pointTemps = self.pointTemps[:-1]
                     self.currentImage = getImage(self.currentData)
                     if self.currentImage != []:
+                        j=0
                         for i in self.coordsSaved:
                             # print(i)        
+                            j+=1
                             cv2.circle(self.currentImage, i, 15, (0,0,0), 3)
+                            drawNumbers(self.currentImage, i, j)
                         width, height = 640, 480
                         image = wx.Image(width,height)
                         img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
@@ -345,6 +366,7 @@ class MyFrame(wx.Frame):
         if img != []:    
             cv2.circle(img, (x,y), 15, (0,0,0), 3)
             self.coordsSaved.append((x,y))
+            drawNumbers(img, self.coordsSaved[-1], len(self.coordsSaved))
             width, height = 640, 480
             image = wx.Image(width,height)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
