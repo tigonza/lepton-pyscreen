@@ -62,10 +62,61 @@ def getImage(data):
     data = cv2.resize(data[:,:], (640, 480))
     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
     img = raw_to_8bit(data)
-    display_temperature(img, minVal, minLoc, (0, 0, 255))
-    display_temperature(img, maxVal, maxLoc, (255, 0, 0))
+    display_temperature(img, minVal, minLoc, (255, 0, 0))
+    display_temperature(img, maxVal, maxLoc, (0, 0, 255))
     # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     return img
+
+def getCropMedium(imageData, x, y):
+    m=4
+    p=4
+
+    if x-m < 0:
+        m = m-x
+        xl = 0
+    else:
+        xl = x-m
+
+
+    if y-p < 0:
+        p = p-y
+        yd = 0
+    else:
+        yd = y-p
+    
+    xr = x + 5
+    yu = y + 5
+
+    square = imageData[xl:xr,yd:yu]
+    csq = np.array(ktoc(square))
+    csv=[]
+    print(csq.shape)
+
+    for i in range(1,m-1):
+        csq[0][i-1]=0
+        csq[-1][i-1]=0
+        csq[i-1][0]=0
+        csq[i-1][-1]=0
+
+    for i in range(1,p-1):
+        csq[0][-i]=0
+        csq[-1][-i]=0
+        csq[-i][0]=0
+        csq[-i][-1]=0
+
+    for i in range(0,9):
+        for j in range(0,9):
+            if i==0 or i==8:
+                if not (j in [0,1,7,8]):
+                    csv.append(csq[i][j])
+            elif i==1 or i==7:
+                if not (j in [0,8]):
+                    csv.append(csq[i][j])
+            else:
+                csv.append(csq[i][j])
+    
+    return csv, csq
+    
 
 def getCrop(imageData, x, y):
     m=5
@@ -87,13 +138,13 @@ def getCrop(imageData, x, y):
     xr = x + 6
     yu = y + 6
 
-    sq = []
-    if m != 5:
-        a =[]
-        for i in range(0,11):
-            a.append(0)
-        for i in range(0,m):
-            sq.append(a)
+    # sq = []
+    # if m != 5:
+    #     a =[]
+    #     for i in range(0,11):
+    #         a.append(0)
+    #     for i in range(0,m):
+    #         sq.append(a)
     
     square = imageData[xl:xr,yd:yu]
     csq = ktoc(square)
@@ -134,13 +185,16 @@ def zipResults(names):
         for i in names:
             z.write(i)
 
-def drawNumbers(img, ca, int):
-    number = str(int - 1)
-    coords = (ca[0]-8, ca[1]+8)
+def drawNumbers(img, ca, ind):
+    number = str(ind - 1)
+    if (ind-1) < 10:
+        coords = (ca[0]-5, ca[1]+6)
+    else:
+        coords = (ca[0]-10, ca[1]+6)
     fontFace = cv2.FONT_HERSHEY_SCRIPT_SIMPLEX
     thickness = 2  
     # fontScale 
-    fontScale = 0.8
+    fontScale = 0.5
     
     # Blue color in BGR 
     color = (0, 0, 0) 
@@ -164,8 +218,11 @@ def saveCsv(csv, temps):
         res.append(line)
         c+=1
 
-    with open(cstring+'.csv','wb') as f:
+    with open(cstring+'.csv','w') as f:
         f.write('index,Center,Promedio,Max\n')
+
+    with open(cstring+'.csv','wb') as f:
+        # f.write('index,Center,Promedio,Max\n')
         for i in np.mat(res):
             np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
         f.close()
@@ -318,7 +375,7 @@ class MyFrame(wx.Frame):
                         for i in self.coordsSaved:
                             # print(i)        
                             j+=1
-                            cv2.circle(self.currentImage, i, 15, (0,0,0), 3)
+                            cv2.circle(self.currentImage, i, 20, (0,0,0), 3)
                             drawNumbers(self.currentImage, i, j)
                         width, height = 640, 480
                         image = wx.Image(width,height)
@@ -385,10 +442,11 @@ class MyFrame(wx.Frame):
             self.Refresh()
             x,y = getLocRaw((x,y))
             try:
-                csv, crop=getCrop(self.currentData, x, y)
+                csv, crop=getCropMedium(self.currentData, x, y)
+                #getCropMedium(self.currentData, x, y)
             except:
                 self.coordsSaved = self.coordsSaved[:-1]
-            if crop.shape != (11,11):
+            if crop.shape != (9,9):
                 print('circulo fuera de la imagen!')
             # elif len(self.coordsSaved)==len(self.savedCrops):
             #     print(len(self.coordsSaved), len(self.savedCrops))
