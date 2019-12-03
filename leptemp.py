@@ -375,7 +375,7 @@ class MyFrame(wx.Frame):
                         for i in self.coordsSaved:
                             # print(i)        
                             j+=1
-                            cv2.circle(self.currentImage, i, 20, (0,0,0), 3)
+                            cv2.circle(self.currentImage, i, 15, (0,0,0), 3)
                             drawNumbers(self.currentImage, i, j)
                         width, height = 640, 480
                         image = wx.Image(width,height)
