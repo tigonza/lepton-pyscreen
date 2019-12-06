@@ -1,6 +1,7 @@
 import wx
 import os
 import cv2
+import csv
 
 from uvctypes import *
 import time
@@ -90,7 +91,7 @@ def getCropMedium(imageData, x, y):
     square = imageData[xl:xr,yd:yu]
     csq = np.array(ktoc(square))
     csv=[]
-    print(csq.shape)
+    # print(csq.shape)
 
     for i in range(1,m-1):
         csq[0][i-1]=0
@@ -179,7 +180,7 @@ def getCrop(imageData, x, y):
 def zipResults(names):
     # img = raw_to_8bit(data)
     now = datetime.now()
-    zipString=now.strftime("/home/pi/Desktop/resultados/%d-%m-%Y_%H:%M:%S:%f")
+    zipString=now.strftime("resultados/%d-%m-%Y_%H:%M:%S:%f")
     # zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
     with ZipFile(zipString,'w') as z:
         for i in names:
@@ -208,7 +209,9 @@ def drawNumbers(img, ca, ind):
 
 
 def saveCsv(csv, temps):
-    cstring = "circulos"
+    cstring = "circulos_info"
+    rstring = "circulos_full"
+
     csv = np.mat(csv)
     c=0
     res=[]
@@ -219,11 +222,17 @@ def saveCsv(csv, temps):
         c+=1
 
     with open(cstring+'.csv','w') as f:
-        f.write('index,Center,Promedio,Max\n')
+        f.write('index,Temp Center,Promedio,Max\n')
 
     with open(cstring+'.csv','wb') as f:
         # f.write('index,Center,Promedio,Max\n')
         for i in np.mat(res):
+            np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
+        f.close()
+
+    with open(rstring+'.csv','wb') as f:
+        # f.write('index,Center,Promedio,Max\n')
+        for i in np.mat(csv):
             np.savetxt(f, np.array(i), fmt='%.2f', delimiter=',')
         f.close()
 
@@ -235,6 +244,14 @@ def saveData(data):
         for i in csv:
             np.savetxt(f, np.array(i), fmt='%.3f', delimiter=' ')
         f.close()
+
+def savePhotoData(name, data):
+    csv = np.mat(data)
+    with open(name+".csv",'w') as f:
+        for i in csv:
+            np.savetxt(f, np.array(i), fmt='%d', delimiter=' ')
+        f.close()
+
 
 
 def display_temperature(img, val_k, loc, color):
@@ -263,6 +280,7 @@ class MyFrame(wx.Frame):
         self.savedCrops=[]
         self.currentImage=[]
         self.stream = True
+        self.snapshot = 0
         self.currentData=[]
         self.pointTemps=[]
 
@@ -287,9 +305,14 @@ class MyFrame(wx.Frame):
         panel2.width = 300
         panel3.SetBackgroundColour("#e4e4e4")
 
-        
+        self.loadBtn = wx.Button(panel2, -1, "Abrir csv")
+        self.loadBtn.Bind(wx.EVT_BUTTON,self.OnOpen)
+
         self.strBtn = wx.Button(panel2, -1, "video")
         self.strBtn.Bind(wx.EVT_BUTTON,self.s_stream)
+
+        self.tenBtn = wx.Button(panel2, -1, "rafaga 10 fotos")
+        self.tenBtn.Bind(wx.EVT_BUTTON,self.ten_pictures)
         
         self.btn = wx.Button(panel2, -1, "tomar foto")
         self.btn.Bind(wx.EVT_BUTTON,self.screenshot)
@@ -322,6 +345,8 @@ class MyFrame(wx.Frame):
         
         box2.Add(self.strBtn, 0, wx.ALIGN_CENTER)
         box2.Add(self.btn, 0, wx.ALIGN_CENTER)
+        box2.Add(self.tenBtn, 0, wx.ALIGN_CENTER)
+
         box3.Add(box2, 1, wx.ALIGN_CENTER)
 
         box22.Add(self.button, 0, wx.ALIGN_CENTER)
@@ -358,6 +383,11 @@ class MyFrame(wx.Frame):
     def s_stream(self, event):
         self.stream = True
 
+    def ten_pictures(self, event):
+        self.snapshot=10
+
+    def load_csv(self, event):
+        self.stream = False
 
     def undoCord(self, event):
         size = len(self.coordsSaved)
@@ -398,10 +428,13 @@ class MyFrame(wx.Frame):
             saveData(self.currentData)
             saveCsv(self.savedCrops, self.pointTemps)
             
-            if not os.path.exists("/home/pi/Desktop/resultados"):
-                os.makedirs("/home/pi/Desktop/resultados") 
+            # if not os.path.exists("/home/pi/Desktop/resultados"):
+            #     os.makedirs("/home/pi/Desktop/resultados")
 
-            names = ['foto.tiff', 'circulos.csv','dataCompleta.csv']
+            if not os.path.exists("resultados"):
+                os.makedirs("resultados") 
+
+            names = ['foto.tiff', 'circulos_info.csv', 'circulos_full.csv','dataCompleta.csv']
             zipResults(names)
             for i in names:
                 os.remove(i)
@@ -422,13 +455,62 @@ class MyFrame(wx.Frame):
 
         else:
             print("no hay mano bro")
+    
+    def OnOpen(self, event):
+        # if self.currentData!=[]:
+        #     print("has data!")
+        #     return
+        
+        # otherwise ask the user what new file to open
+        with wx.FileDialog(self, "Open .CSV file", wildcard="CSV files (*.csv)|*.csv",
+                        style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
 
+            if fileDialog.ShowModal() == wx.ID_CANCEL:
+                return     # the user changed their mind
+
+            # Proceed loading the file chosen by the user
+            pathname = fileDialog.GetPath()
+            prefix=pathname[:-4]
+            suffix=['.csv', '.tiff']
+            rows=[]
+            try:
+                with open(prefix+suffix[0], 'r') as file:
+                    reader = csv.reader(file,delimiter=" ")
+                    for r in reader:
+                        row=[]
+                        for i in r:
+                            row.append(np.uint16(i))
+                        rows.append(np.array(row))
+            except IOError:
+                wx.LogError("Cannot open file ")
+            data=np.array(rows)
+        self.stream=False
+        self.coordsSaved = []
+        if len(self.savedCrops) > 0:
+            for _ in range(self.index):
+                self.index-=1
+                eraseLine(self, self.index)
+            self.savedCrops = []
+            self.pointTemps = []
+        
+        self.currentData=np.array(data)                  
+        self.currentImage = getImage(data)
+
+        #img = cv2.imread(prefix+suffix[1], cv2.IMREAD_COLOR)
+
+        img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+        width, height = 640, 480
+        image = wx.Image(width,height)
+        image.SetData(img)
+        self.videobmp.SetBitmap(wx.Bitmap(image))
+        self.Refresh()
+        
 
     def getCoordinates(self, event):
         x, y=event.GetPosition()
         # ss = str(x)+' '+str(y)
         img = self.currentImage
-        crops =[]
+        crop =[]
         csv = []
         if img != []:    
             cv2.circle(img, (x,y), 15, (0,0,0), 3)
@@ -472,7 +554,8 @@ class MyFrame(wx.Frame):
         if data is None:
             print("no hay camera feed")
         else:
-            self.currentData=np.array(data)                  
+            # print(type(data), type(data[0]), type(data[0][1]), type(data[10][10]))
+            self.currentData=np.array(data)    
             self.currentImage = getImage(data)
             img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
             width, height = 640, 480
@@ -487,13 +570,24 @@ class MyFrame(wx.Frame):
             if data is None:
                 print("no hay camera feed")
             else:
+                # print(type(data[0][3]))
                 img = getImage(data)
+                if self.snapshot>0:
+                    now = datetime.now()
+                    fstring=now.strftime("resultados/%d-%m-%Y_%H:%M:%S:%f-foto_00"+str(11-self.snapshot))
+                    savePhotoData(fstring,data)
+                    cv2.imwrite(fstring+".tiff", img)
+                    self.snapshot-=1
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 width, height = 640, 480
                 image = wx.Image(width,height)
                 image.SetData(img)
                 self.videobmp.SetBitmap(wx.Bitmap(image))
                 self.Refresh()
+
+
+                
+
     
 
 class ButtonPanel(wx.Panel):
