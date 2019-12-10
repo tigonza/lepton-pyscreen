@@ -63,8 +63,8 @@ def getImage(data):
     data = cv2.resize(data[:,:], (640, 480))
     minVal, maxVal, minLoc, maxLoc = cv2.minMaxLoc(data)
     img = raw_to_8bit(data)
-    display_temperature(img, minVal, minLoc, (255, 0, 0))
-    display_temperature(img, maxVal, maxLoc, (0, 0, 255))
+    display_temperature(img, minVal, minLoc, (255, 255, 255))
+    display_temperature(img, maxVal, maxLoc, (255, 255, 255))
     # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     return img
 
@@ -197,7 +197,7 @@ def drawNumbers(img, ca, ind):
     # fontScale 
     fontScale = 0.5
     
-    # Blue color in BGR 
+    # Black color in BGR 
     color = (0, 0, 0) 
     
     # Line thickness of 2 px 
