@@ -180,7 +180,7 @@ def getCrop(imageData, x, y):
 def zipResults(names):
     # img = raw_to_8bit(data)
     now = datetime.now()
-    zipString=now.strftime("resultados/%d-%m-%Y_%H:%M:%S:%f")
+    zipString=now.strftime("/home/pi/Desktop/resultados/%d-%m-%Y_%H:%M:%S:%f")
     # zipString=now.strftime("%d-%m-%Y_%H:%M:%S:%f")
     with ZipFile(zipString,'w') as z:
         for i in names:
@@ -326,6 +326,7 @@ class MyFrame(wx.Frame):
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onTimer)
         
+        self.tick=0
         self.timer.Start(1000/9)
 
         sbox.Add(self.streamPanel, 1,wx.EXPAND | wx.ALL, 10)
@@ -428,11 +429,11 @@ class MyFrame(wx.Frame):
             saveData(self.currentData)
             saveCsv(self.savedCrops, self.pointTemps)
             
-            # if not os.path.exists("/home/pi/Desktop/resultados"):
-            #     os.makedirs("/home/pi/Desktop/resultados")
+            if not os.path.exists("/home/pi/Desktop/resultados"):
+                os.makedirs("/home/pi/Desktop/resultados")
 
-            if not os.path.exists("resultados"):
-                os.makedirs("resultados") 
+            # if not os.path.exists("resultados"):
+            #     os.makedirs("resultados") 
 
             names = ['foto.tiff', 'circulos_info.csv', 'circulos_full.csv','dataCompleta.csv']
             zipResults(names)
@@ -565,6 +566,8 @@ class MyFrame(wx.Frame):
             self.Refresh()
 
     def onTimer(self, event):
+        if self.tick==3:
+            self.tick=0
         if self.stream:
             data = q.get(True, 500)
             if data is None:
@@ -572,9 +575,10 @@ class MyFrame(wx.Frame):
             else:
                 # print(type(data[0][3]))
                 img = getImage(data)
-                if self.snapshot>0:
+                if self.snapshot>0 and self.tick==0:
                     now = datetime.now()
-                    fstring=now.strftime("resultados/%d-%m-%Y_%H:%M:%S:%f-foto_00"+str(11-self.snapshot))
+                    fstring=now.strftime("/home/pi/Desktop/resultados/%d-%m-%Y_%H:%M:%S:%f-foto_00"+str(11-self.snapshot))
+                    # fstring=now.strftime("resultados/%d-%m-%Y_%H:%M:%S:%f-foto_00"+str(11-self.snapshot))
                     savePhotoData(fstring,data)
                     cv2.imwrite(fstring+".tiff", img)
                     self.snapshot-=1
@@ -584,6 +588,7 @@ class MyFrame(wx.Frame):
                 image.SetData(img)
                 self.videobmp.SetBitmap(wx.Bitmap(image))
                 self.Refresh()
+        self.tick+=1
 
 
                 
