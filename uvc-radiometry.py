@@ -100,6 +100,8 @@ def main():
       if res < 0:
         print("uvc_start_streaming failed: {0}".format(res))
         exit(1)
+      print("uvc_start_streaming res: {0}".format(res))
+    
       
       try:
         while True:

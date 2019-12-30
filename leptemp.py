@@ -7,6 +7,7 @@ from uvctypes import *
 import time
 import numpy as np
 from cv2def import *
+import cv2def as cd
 from datetime import datetime
 from zipfile import ZipFile
 
@@ -119,7 +120,7 @@ class MyFrame(wx.Frame):
         self.snapshot = 0
         self.currentData=[]
         self.pointTemps=[]
-
+        self.cmap = getCmpMod()
         # main_panel es el panel principal(la ventana entera)
         # panel1 es la izqda, panel 2 la derecha.
         main_panel = wx.Panel(self)
@@ -234,6 +235,7 @@ class MyFrame(wx.Frame):
                     self.savedCrops = self.savedCrops[:-1]
                     self.pointTemps = self.pointTemps[:-1]
                     self.currentImage = getImage(self.currentData)
+                    # self.currentImage= apply_custom_colormap(self.currentImage, self.cmap)
                     if self.currentImage != []:
                         j=0
                         for i in self.coordsSaved:
@@ -243,7 +245,7 @@ class MyFrame(wx.Frame):
                             drawNumbers(self.currentImage, i, j)
                         width, height = 640, 480
                         image = wx.Image(width,height)
-                        img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+                        # img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
                         image.SetData(img)
                         self.videobmp.SetBitmap(wx.Bitmap(image))
                         self.Refresh()
@@ -389,9 +391,15 @@ class MyFrame(wx.Frame):
             print("no hay camera feed")
         else:
             # print(type(data), type(data[0]), type(data[0][1]), type(data[10][10]))
-            self.currentData=np.array(data)    
+            self.currentData=np.array(data)
+            # print( ktoc(self.currentData[59][79]))
             self.currentImage = getImage(data)
-            img = cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR)
+            # d = cv2.resize(self.currentData[:,:], (640, 480))
+            # print(ktoc(d[119][319]))
+            # imm = raw_to_8bit(d)
+            img =cv2.cvtColor(self.currentImage, cv2.COLOR_RGB2BGR) 
+
+            print(img.shape)
             width, height = 640, 480
             image = wx.Image(width,height)
             image.SetData(img)
@@ -415,7 +423,9 @@ class MyFrame(wx.Frame):
                     savePhotoData(fstring,data)
                     cv2.imwrite(fstring+".tiff", img)
                     self.snapshot-=1
-                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                # img =cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                img = cv2.applyColorMap(img, cv2.COLORMAP_JET)
+                img =cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 width, height = 640, 480
                 image = wx.Image(width,height)
                 image.SetData(img)
@@ -436,6 +446,8 @@ if __name__ == "__main__":
     PTR_PY_FRAME_CALLBACK = CFUNCTYPE(None, POINTER(uvc_frame), c_void_p)(py_frame_callback)
 
     res = libuvc.uvc_init(byref(ctx), 0)
+    
+
     if res < 0:
         print("uvc_init error")
         exit(1)
