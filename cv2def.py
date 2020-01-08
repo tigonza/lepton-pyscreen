@@ -169,7 +169,7 @@ def display_temperature(img, val_k, loc, color):
 
 def drawNumbers(img, ca, ind, col):
     number = str(ind)
-    if (ind-1) < 10:
+    if (ind) < 10:
         coords = (ca[0]-5, ca[1]+6)
     else:
         coords = (ca[0]-10, ca[1]+6)
@@ -215,16 +215,18 @@ def getCmpMod():
     newcolors[222:] = pink
     newcmp = ListedColormap(newcolors)
     # newcmp = ListedColormap(viridis)
-    return newcmp
+    return viridis
 
-def norm(data):
+def norm(data, mins=0, maxs=0):
     mi = np.min(data)
     ma = np.max(data)
-    mins=19
-    maxs=36
+
+    if mins!=maxs:
+        mi = mins
+        ma = maxs
     
-    data = data - mins
-    return data/(maxs-mins)
+    data = data - mi
+    return data/(ma-mi)
 
 def getPicture(path):       
     rows = []
@@ -237,9 +239,9 @@ def getPicture(path):
             rows.append(np.array(row))
     return np.array(rows)
 
-def getImage2(rows):
+def getImage2(rows, ab=(0,0)):
     m = getCmpMod()
     rows=ktoc(rows)
     rows = cv2.resize(rows[:,:], (640, 480))
-    im =norm(rows)*255
+    im =norm(rows, ab[0], ab[1])*255
     return apply_custom_colormap(np.uint8(im), m)

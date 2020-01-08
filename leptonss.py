@@ -1,6 +1,7 @@
 import wx
 import os
 import cv2
+import sys
 import csv
 
 from uvctypes import *
@@ -152,7 +153,7 @@ def loadConf():
 
 class MyFrame(wx.Frame):
     def __init__(self, parent, ID, title):
-        wx.Frame.__init__(self, parent, ID, title, size=(910, 500))
+        wx.Frame.__init__(self, parent, ID, title, size=(914, 500))
 
         # valores necesarios de tener en memoria
         self.coordsSaved=[]
@@ -183,10 +184,13 @@ class MyFrame(wx.Frame):
         #panel3 is the main panel, #panel4 is the conf panel
         panel3 = wx.Panel(confPanel, -1, size=(230, 500))
         panel4 = wx.Panel(confPanel, -1, size=(230, 500))
+        panel5 = wx.Panel(confPanel, -1, size=(230, 500))
 
 
-        confPanel.AddPage(panel3, "main")
-        confPanel.AddPage(panel4, "config")
+        confPanel.AddPage(panel3, 'main')
+        confPanel.AddPage(panel4, 'config')
+        confPanel.AddPage(panel5, 'norm')
+
 
         imageBitmap = wx.Bitmap(self.image)
         self.videobmp = wx.StaticBitmap(self.streamPanel, wx.ID_ANY, imageBitmap)
@@ -194,6 +198,8 @@ class MyFrame(wx.Frame):
         panel1.SetBackgroundColour("#000000")
         panel3.SetBackgroundColour("#e4e4e4")
         panel4.SetBackgroundColour("#e4e4e4")
+        panel5.SetBackgroundColour("#e4e4e4")
+
 
         #sbox is stream box. Contains streampanel. Fitted to panel1 
         sbox = wx.BoxSizer(wx.VERTICAL)
@@ -206,37 +212,27 @@ class MyFrame(wx.Frame):
 
         boxMain = wx.BoxSizer(wx.VERTICAL)
         boxConfigInit = wx.BoxSizer(wx.VERTICAL)
+        boxNorm = wx.BoxSizer(wx.VERTICAL)
 
-        # titulo automatico vs manual.
-        automansizer = wx.BoxSizer(wx.HORIZONTAL)
-        title = wx.StaticText(panel3, -1, '  Tipo de seleccion')
+        # Titulo resultados
+        restitsizer = wx.BoxSizer(wx.HORIZONTAL)
+        title = wx.StaticText(panel3, -1, '  Resultados del análisis')
         font = self.GetFont()
         font.SetWeight(wx.FONTWEIGHT_BOLD)
         title.SetFont(font)
-        automansizer.Add(title, 0, wx.ALL, 2)
+        restitsizer.Add(title, 0, wx.ALL, 2)
 
-        # tipo de seleccion
-        automanradsizer = wx.BoxSizer(wx.HORIZONTAL)
-        autorad = wx.RadioButton(panel3,wx.ID_ANY, label = 'auto', style=wx.RB_GROUP) 
-        manrad = wx.RadioButton(panel3,wx.ID_ANY, label = 'manual')
+        # Resultados listBox
+        resBox= wx.BoxSizer(wx.HORIZONTAL)
 
-        automanradsizer.Add(autorad, 0, wx.ALL, 5)
-        automanradsizer.Add(manrad, 0, wx.ALL, 5)
-
-        manrad.SetValue(True)
-
-        # inputs y labels
-        abInputBox = wx.BoxSizer(wx.HORIZONTAL)
+        self.lister = wx.ListCtrl(panel3, wx.ID_ANY, style=wx.LC_REPORT)
+        self.lister.InsertColumn(0, 'circulo', wx.LIST_FORMAT_CENTRE)
+        self.lister.InsertColumn(1, 'max', wx.LIST_FORMAT_CENTRE)
+        self.lister.InsertColumn(2, 'mean', wx.LIST_FORMAT_CENTRE)
         
-        labelOne = wx.StaticText(panel3, wx.ID_ANY, 'min')
-        self.aInput = wx.TextCtrl(panel3, wx.ID_ANY, '')
-        labelTwo = wx.StaticText(panel3, wx.ID_ANY, 'max')
-        self.bInput = wx.TextCtrl(panel3, wx.ID_ANY, '')
 
-        abInputBox.Add(labelOne, 0, wx.ALL, 5)
-        abInputBox.Add(self.bInput, 0 , wx.EXPAND, 5)
-        abInputBox.Add(labelTwo, 0, wx.ALL, 5)
-        abInputBox.Add(self.aInput, 0 , wx.EXPAND, 5)
+        resBox.Add(self.lister,0,wx.EXPAND) 
+
 
         # Analizar button
         startBox = wx.BoxSizer(wx.HORIZONTAL)
@@ -329,7 +325,7 @@ class MyFrame(wx.Frame):
         lstCirSizer = wx.BoxSizer(wx.HORIZONTAL)
         confSaveSizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        newButton = wx.Button(panel4, -1, "Nueva")
+        self.newButton = wx.Button(panel4, -1, "Nueva")
         self.eraseButton = wx.Button(panel4, -1, "Borrar")
         self.saveButton = wx.Button(panel4, -1, "Guardar/Cancelar Calibracion")
         self.saveButton.Disable()
@@ -338,13 +334,45 @@ class MyFrame(wx.Frame):
         confSaveSizer.AddStretchSpacer()
         confSaveSizer.Add(confButton, 1, wx.ALL, 5)
 
-        lstCirSizer.Add(newButton, 1, wx.ALL|wx.EXPAND, 5)
+        lstCirSizer.Add(self.newButton, 1, wx.ALL|wx.EXPAND, 5)
         lstCirSizer.Add(self.eraseButton, 1, wx.ALL|wx.EXPAND, 5)
 
+        # titulo automatico vs manual.
+        automansizer = wx.BoxSizer(wx.HORIZONTAL)
+        title = wx.StaticText(panel5, -1, '  Normalizacion')
+        font = self.GetFont()
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
+        title.SetFont(font)
+        automansizer.Add(title, 0, wx.ALL, 2)
+
+        # tipo de seleccion
+        automanradsizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.autorad = wx.RadioButton(panel5,wx.ID_ANY, label = 'auto', style=wx.RB_GROUP) 
+        self.manrad = wx.RadioButton(panel5,wx.ID_ANY, label = 'manual')
+
+        automanradsizer.Add(self.autorad, 0, wx.ALL, 5)
+        automanradsizer.Add(self.manrad, 0, wx.ALL, 5)
+
+        self.autorad.SetValue(True)
+
+        # inputs y labels
+        abInputBox = wx.BoxSizer(wx.HORIZONTAL)
+        
+        labelOne = wx.StaticText(panel5, wx.ID_ANY, 'min')
+        self.aInput = wx.TextCtrl(panel5, wx.ID_ANY, '')
+        labelTwo = wx.StaticText(panel5, wx.ID_ANY, 'max')
+        self.bInput = wx.TextCtrl(panel5, wx.ID_ANY, '')
+
+        abInputBox.Add(labelOne, 0, wx.ALL, 5)
+        abInputBox.Add(self.aInput, 0 , wx.EXPAND, 5)
+        abInputBox.Add(labelTwo, 0, wx.ALL, 5)
+        abInputBox.Add(self.bInput, 0 , wx.EXPAND, 5)
+        self.bInput.Disable()
+        self.aInput.Disable()
+
         # boxes para panel3
-        boxMain.Add(automansizer, 0, wx.ALL, 5)
-        boxMain.Add(automanradsizer, 0, wx.ALL, 5)
-        boxMain.Add(abInputBox, 0, wx.ALL|wx.EXPAND, 5)
+        boxMain.Add(restitsizer, 0, wx.ALL, 5)
+        boxMain.Add(resBox, 0, wx.ALL|wx.EXPAND, 5)
         boxMain.AddStretchSpacer()
         boxMain.Add(startBox, 0, wx.ALL|wx.EXPAND, 2)
 
@@ -367,27 +395,31 @@ class MyFrame(wx.Frame):
 
 
         panel4.SetSizer(boxConfigInit)
-
         main_panel.SetSizer(box)
-        self.videobmp.Bind(wx.EVT_LEFT_DOWN, self.getCoordinates)
-        self.videobmp.Bind(wx.EVT_RIGHT_DOWN, self.undoCord)
 
-        self.saveButton.Bind(wx.EVT_BUTTON , self.saveCircles)
-
+        # boxes para panel5
+        boxNorm.Add(automansizer, 0, wx.ALL, 5)
+        boxNorm.Add(automanradsizer, 0, wx.ALL, 5)
+        boxNorm.Add(abInputBox, 0, wx.ALL|wx.EXPAND, 5)
+        boxNorm.Add(wx.StaticLine(panel5,), 0, wx.ALL|wx.EXPAND, 5)
+        
+        panel5.SetSizer(boxNorm)
         
         self.timer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.onTimer)
-        
         self.tick=0
-        self.timer.Start(1000/8)
-
-        newButton.Bind(wx.EVT_BUTTON, self.on_open)
+        self.Bind(wx.EVT_TIMER, self.onTimer)        
+        self.videobmp.Bind(wx.EVT_LEFT_DOWN, self.getCoordinates)
+        self.videobmp.Bind(wx.EVT_RIGHT_DOWN, self.undoCord)
+        self.saveButton.Bind(wx.EVT_BUTTON , self.saveCircles)
+        self.newButton.Bind(wx.EVT_BUTTON, self.on_open)
         self.eraseButton.Bind(wx.EVT_BUTTON, self.deleteList)
         confButton.Bind(wx.EVT_BUTTON, self.saveConf)
-        autorad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
-        manrad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
+        self.autorad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
+        self.manrad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
         startButton.Bind(wx.EVT_BUTTON, self.analize)
         self.lst.Bind(wx.EVT_COMBOBOX_CLOSEUP, self.lstUpdate)
+
+        self.timer.Start(1000/8)
 
     def lstUpdate(self, event):
         self.analizeCoord = []
@@ -408,6 +440,9 @@ class MyFrame(wx.Frame):
         else:
             self.callibrating = False
             self.saveButton.Disable()
+            self.lst.Enable()
+            self.eraseButton.Enable()
+            self.newButton.Enable()
     
     def saveCircles(self, event):
         if len(self.coordsSaved)==0:
@@ -442,6 +477,9 @@ class MyFrame(wx.Frame):
         self.name=''
         self.callibrating=False
         self.saveButton.Disable()
+        self.lst.Enable()
+        self.eraseButton.Enable()
+        self.newButton.Enable()
         self.coordsSaved=[]
 
     def on_open(self, event):
@@ -452,6 +490,9 @@ class MyFrame(wx.Frame):
             self.coordsSaved = []
             self.callibrating=True
             self.saveButton.Enable()
+            self.lst.Disable()
+            self.eraseButton.Disable()
+            self.newButton.Disable()
                 
     def getCoordinates(self, event):
         x, y=event.GetPosition()
@@ -478,22 +519,35 @@ class MyFrame(wx.Frame):
             if data is None:
                 print("no hay camera feed")
             else:
-                img = getImage2(self.currentData)
+                ab = (self.aInput.GetValue(), self.bInput.GetValue())
+                img=[]
+                if self.autorad.GetValue():
+                    img = getImage2(self.currentData)
+                else:
+                    try:
+                        ab = (int(ab[0]),int(ab[1]))
+                        img = getImage2(self.currentData, ab)
+                    except:
+                        img = getImage2(self.currentData)
+                
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                index=self.lst.GetCurrentSelection()
+                l=self.confcoords[index] 
                 if self.callibrating:
                     for i in range(len(self.coordsSaved)):
                         cv2.circle(img, self.coordsSaved[i], 15, (0,0,0), 3)
                         drawNumbers(img, self.coordsSaved[i], i+1, (0,0,0))
-
-                index=self.lst.GetCurrentSelection()
-                l=self.confcoords[index] 
-                if not self.callibrating:
-                    for i in l:
-                        cv2.circle(img, i, 15, (0,0,0), 3)
-                if len(self.analizeCoord)>0:
-                    for i in range(len(self.analizeCoord)):
-                        cv2.circle(img, self.analizeCoord[i].coord, 15, self.analizeCoord[i].eva, 3)
-                        drawNumbers(img, self.analizeCoord[i].coord, i+1, self.analizeCoord[i].eva)
+                else:
+                    c=1
+                    if len(self.analizeCoord)>0:
+                        for i in self.analizeCoord:
+                            cv2.circle(img, i.coord, 15, i.eva, 3)
+                            drawNumbers(img, i.coord, i.number, i.eva)
+                    else:
+                        for i in l:
+                            cv2.circle(img, i, 15, (0,0,0), 3)
+                            drawNumbers(img, i, c, (0,0,0))
+                            c+=1
                 self.image.SetData(img)
                 self.videobmp.SetBitmap(wx.Bitmap(self.image))
                 self.Layout()
@@ -529,6 +583,7 @@ class MyFrame(wx.Frame):
             f.writelines(data)
                 
     def analize(self, event):
+        self.lister.DeleteAllItems()
         index=self.lst.GetCurrentSelection()
         rawCoords=[]
         evals = []
@@ -558,10 +613,15 @@ class MyFrame(wx.Frame):
                 resp=CircleEval(i, (255,214,0), count)
             else:
                 resp=CircleEval(i, (255,0,0), count)
-            
+            count+=1
+
+            index = self.lister.InsertItem(sys.maxsize, str(resp.number)) 
+            self.lister.SetItem(index, 1, "{0:.2f}".format(np.max(temps)) ) 
+            self.lister.SetItem(index, 2, "{0:.2f}".format(np.mean(temps)) )
             rawCoords.append(resp)
-            
+
         self.analizeCoord=rawCoords
+
 
 if __name__ == "__main__":
     ctx = POINTER(uvc_context)()
