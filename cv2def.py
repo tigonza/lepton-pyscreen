@@ -140,7 +140,7 @@ def ktoc(val):
 
 def getLocRaw(coords):
     return (np.int(coords[1]*120/480),np.int(coords[0]*160/640))
-#72315
+
 def raw_to_8bit(data):
     # normalize considers a 16bit usage, and then does an 8 bit shift
     # to fit the unsigned 8bit int array format.
@@ -210,19 +210,21 @@ def plot_examples(cms):
 
 def getCmpMod():
     viridis = cm.get_cmap('jet', 256)
-    newcolors = viridis(np.linspace(0.1, 1, 256))
+    newcolors = viridis(np.linspace(0, 1, 256))
     pink = np.array([1, 0.7, 1, 1])
-    step = 1/256
     newcolors[222:] = pink
     newcmp = ListedColormap(newcolors)
     # newcmp = ListedColormap(viridis)
-    return viridis
+    return newcmp
 
 def norm(data):
     mi = np.min(data)
     ma = np.max(data)
-    data = data - mi
-    return data/(ma-mi)
+    mins=19
+    maxs=36
+    
+    data = data - mins
+    return data/(maxs-mins)
 
 def getPicture(path):       
     rows = []
@@ -241,10 +243,3 @@ def getImage2(rows):
     rows = cv2.resize(rows[:,:], (640, 480))
     im =norm(rows)*255
     return apply_custom_colormap(np.uint8(im), m)
-    
-
-    
-    
-    
-
-

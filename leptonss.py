@@ -170,8 +170,7 @@ class MyFrame(wx.Frame):
             self.conf=loadConf()
         except:
             print('error')
-            
-
+        
         # main_panel es el panel principal(la ventana entera)
         # panel1 es la izqda, panel 2 la derecha.
         main_panel = wx.Panel(self)
@@ -380,15 +379,18 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.onTimer)
         
         self.tick=0
-        self.timer.Start(112)
+        self.timer.Start(1000/8)
 
         newButton.Bind(wx.EVT_BUTTON, self.on_open)
         self.eraseButton.Bind(wx.EVT_BUTTON, self.deleteList)
-        confButton.Bind(wx.EVT_BUTTON, self.saveConf)    
+        confButton.Bind(wx.EVT_BUTTON, self.saveConf)
         autorad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
         manrad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
         startButton.Bind(wx.EVT_BUTTON, self.analize)
+        self.lst.Bind(wx.EVT_COMBOBOX_CLOSEUP, self.lstUpdate)
 
+    def lstUpdate(self, event):
+        self.analizeCoord = []
 
     def radioButtonEvt(self, event):
         a=event.GetEventObject().GetLabel()
@@ -413,14 +415,24 @@ class MyFrame(wx.Frame):
         msg='Calibracion Cancelada'
         if saveCallibrationMsg(self):
             self.confcoords.append(self.coordsSaved)
+            self.choices.append(self.name)
             self.lst.Append(self.name)
-            with open('conf.txt','a') as f:
-                f.write('\n')
-                f.write(self.name+':')
-                for i in self.coordsSaved:
-                    f.write(str(i))
-                    if i != self.coordsSaved[-1]:
-                        f.write('/')
+
+            with open('conf.txt','r') as f:
+                data=f.readlines()
+            
+            data[4] = str(len(self.confcoords))+'\n'
+            s = self.name+':'
+            for i in self.coordsSaved:
+                s = s+str(i)
+                if i != self.coordsSaved[-1]:
+                    s = s+'/'
+            data[-1] =data[-1]+'\n' 
+            data.append(s)
+            
+            with open('conf.txt','w') as f:
+                f.writelines(data)
+
             msg = 'Guardado exitoso'
             self.conf[4]+=1
         dlg = wx.MessageDialog(None, msg, '',wx.OK)
@@ -452,6 +464,8 @@ class MyFrame(wx.Frame):
             n = self.lst.GetCurrentSelection()
             self.lst.Delete(n)
             self.lst.SetSelection(0)
+            self.confcoords.pop(n)
+            self.choices.pop(n)
         else:
             self.lst.Append('')
             self.lst.SetSelection(1)
@@ -470,6 +484,12 @@ class MyFrame(wx.Frame):
                     for i in range(len(self.coordsSaved)):
                         cv2.circle(img, self.coordsSaved[i], 15, (0,0,0), 3)
                         drawNumbers(img, self.coordsSaved[i], i+1, (0,0,0))
+
+                index=self.lst.GetCurrentSelection()
+                l=self.confcoords[index] 
+                if not self.callibrating:
+                    for i in l:
+                        cv2.circle(img, i, 15, (0,0,0), 3)
                 if len(self.analizeCoord)>0:
                     for i in range(len(self.analizeCoord)):
                         cv2.circle(img, self.analizeCoord[i].coord, 15, self.analizeCoord[i].eva, 3)
@@ -479,20 +499,34 @@ class MyFrame(wx.Frame):
                 self.Layout()
     
     def saveConf(self, event):
-        with open('circulos.txt','w') as f:
-            for i in range(5):
-                f.write(str(self.conf[i])+'\n')
-            for i in range(self.conf[4]):
-                if self.conf[i+5].default:
-                    f.write('*'+self.conf[i+5].name+':')
-                else:
-                    f.write(self.conf[i+5].name+':')
-                for j in self.conf[i+5].coords:
-                    f.write(str( (j[0],j[1]) ))
-                    if j != self.conf[i+5].coords[-1]:
-                        f.write('/')
-                if i!=(self.conf[4]-1):
-                    f.write('\n')
+        with open('conf.txt', 'r') as file:
+            data = file.readlines()
+        a=1
+        if self.meanrad.GetValue():
+            a=0
+        newConf = [str(a)+'\n',self.umbralSupInput.GetValue()+'\n',self.umbralInfInput.GetValue()+'\n']
+        if self.mrad.GetValue():
+            newConf.append('1\n')
+        else:
+            newConf.append('0\n')
+        data[:4] = newConf
+
+        aux=[]
+        if int(data[4])!=len(self.confcoords):
+            for i in range(len(self.confcoords)):
+                s = self.choices[i]+':'
+                for j in self.confcoords[i]:
+                    s = s+str(j)
+                    if j != self.confcoords[i][-1]:
+                        s = s+'/'
+                aux.append(s+'\n')
+            data[4] = str(len(self.confcoords))+'\n'
+            data[5:] = aux
+            data[-1] = data[-1][:-1]
+
+        
+        with open('conf.txt','w') as f:
+            f.writelines(data)
                 
     def analize(self, event):
         index=self.lst.GetCurrentSelection()
@@ -528,12 +562,6 @@ class MyFrame(wx.Frame):
             rawCoords.append(resp)
             
         self.analizeCoord=rawCoords
-
-        
-        
-
-
-
 
 if __name__ == "__main__":
     ctx = POINTER(uvc_context)()
@@ -582,4 +610,3 @@ if __name__ == "__main__":
             libuvc.uvc_unref_device(dev)
     finally:
         libuvc.uvc_exit(ctx)
-    

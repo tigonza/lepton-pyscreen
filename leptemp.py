@@ -164,7 +164,7 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.onTimer)
         
         self.tick=0
-        self.timer.Start(1000/9)
+        self.timer.Start(1000/8)
 
         sbox.Add(self.streamPanel, 1,wx.EXPAND | wx.ALL, 10)
         panel1.SetSizer(sbox)
