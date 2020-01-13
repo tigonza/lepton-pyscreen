@@ -194,7 +194,6 @@ class MyFrame(wx.Frame):
         confPanel.AddPage(panel4, 'config')
         confPanel.AddPage(panel5, 'norm')
 
-
         imageBitmap = wx.Bitmap(self.image)
         self.videobmp = wx.StaticBitmap(self.streamPanel, wx.ID_ANY, imageBitmap)
         
@@ -230,17 +229,17 @@ class MyFrame(wx.Frame):
 
         self.lister = wx.ListCtrl(panel3, wx.ID_ANY, style=wx.LC_REPORT)
         self.lister.InsertColumn(0, 'circulo', wx.LIST_FORMAT_CENTRE)
-        self.lister.InsertColumn(1, 'max(°C)', wx.LIST_FORMAT_CENTRE)
-        self.lister.InsertColumn(2, 'mean(°C)', wx.LIST_FORMAT_CENTRE)
+        self.lister.InsertColumn(1, 'Resultado', wx.LIST_FORMAT_CENTRE, width=wx.LIST_AUTOSIZE_USEHEADER)
         
 
-        resBox.Add(self.lister,0,wx.EXPAND) 
+        resBox.Add(self.lister,1,wx.EXPAND) 
 
 
         # Analizar button
         startBox = wx.BoxSizer(wx.HORIZONTAL)
 
         startButton = wx.Button(panel3, -1, "Analizar")
+        # startButton.SetBackgroundColour((32,198,0))
         startBox.AddStretchSpacer()
         startBox.Add(startButton, 1, wx.ALL, 5)
         
@@ -391,7 +390,7 @@ class MyFrame(wx.Frame):
         cmpsizer.Add(title, 0, wx.ALL, 2)
 
         # cmp: label y lister.
-        colors = ['gray', 'magma', 'hot', 'afmhot', 'copper', 'jet']
+        colors = ['jet', 'magma', 'hot', 'afmhot', 'copper', 'gray']
         self.cmplst = wx.ComboBox(panel5, choices = colors , style = wx.CB_DROPDOWN|wx.CB_READONLY)
         self.cmplst.SetSelection(0)
 
@@ -399,7 +398,7 @@ class MyFrame(wx.Frame):
 
         # boxes para panel3
         boxMain.Add(restitsizer, 0, wx.ALL, 5)
-        boxMain.Add(resBox, 0, wx.ALL|wx.EXPAND, 5)
+        boxMain.Add(resBox, 2, wx.ALL|wx.EXPAND, 5)
         boxMain.AddStretchSpacer()
         boxMain.Add(startBox, 0, wx.ALL|wx.EXPAND, 2)
 
@@ -435,6 +434,7 @@ class MyFrame(wx.Frame):
         
         panel5.SetSizer(boxNorm)
         
+        self.Layout()
         self.timer = wx.Timer(self)
         self.tick=0
         self.Bind(wx.EVT_TIMER, self.onTimer)        
@@ -594,6 +594,7 @@ class MyFrame(wx.Frame):
             self.eraseButton.Disable()
 
     def onTimer(self, event):
+        sc=0
         if self.stream:
             self.currentData = q.get(True, 500)
             if data is None:
@@ -629,9 +630,10 @@ class MyFrame(wx.Frame):
                             cv2.circle(img, i, 15, (0,0,0), 3)
                             drawNumbers(img, i, c, (0,0,0))
                             c+=1
-                self.image.SetData(img)
-                self.videobmp.SetBitmap(wx.Bitmap(self.image))
-                self.Layout()
+                
+                image =wx.Image(640,480)
+                image.SetData(img)
+                self.videobmp.SetBitmap(wx.Bitmap(image))
     
     def saveConf(self, event):
         with open('conf.txt', 'r') as file:
@@ -690,16 +692,24 @@ class MyFrame(wx.Frame):
             resp=None
             if value>sup:
                 resp=CircleEval(i, (41,255,0), count)
+                index=self.lister.InsertItem(sys.maxsize, str(resp.number))
+                self.lister.SetItem(index, 1, 'SELECCIONAR')
+                self.lister.SetItemTextColour(index, (32,198,0))
             elif value<sup and value>inf:
                 resp=CircleEval(i, (255,214,0), count)
+                index=self.lister.InsertItem(sys.maxsize, str(resp.number))
+                self.lister.SetItem(index, 1, 'CONSIDERAR')
+                self.lister.SetItemTextColour(index, (255,194,0))
             else:
                 resp=CircleEval(i, (255,0,0), count)
+                index=self.lister.InsertItem(sys.maxsize, str(resp.number))
+                self.lister.SetItem(index, 1, 'RECHAZADO')
+                self.lister.SetItemTextColour(index, (255,0,0))
             count+=1
 
-            index = self.lister.InsertItem(sys.maxsize, str(resp.number)) 
-            self.lister.SetItem(index, 1, "{0:.2f}".format(np.max(temps)) ) 
-            self.lister.SetItem(index, 2, "{0:.2f}".format(np.mean(temps)) )
+             
             rawCoords.append(resp)
+        self.lister.SetColumnWidth(1, wx.LIST_AUTOSIZE)
 
         self.analizeCoord=rawCoords
 
