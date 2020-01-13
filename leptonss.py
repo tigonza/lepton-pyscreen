@@ -65,22 +65,25 @@ def py_frame_callback(frame, userptr):
         q.put(data)
             
 def saveCallibrationMsg(self):
-    dlg = wx.TextEntryDialog(None, 'Escriba nombre','Nueva Lista', style=wx.OK|wx.CANCEL)
-    if dlg.ShowModal() == wx.ID_OK:
-        self.name=dlg.GetValue()
-        if self.name == '':
-            return False
-        aux = self.name.split(' ')
-        if len(aux)>1:
-            self.name=''
-            for i in aux:
-                self.name = self.name + i + '_'
-            self.name = self.name[:-1]
-        dlg.Destroy()
+    if self.editing:
         return True
     else:
-        return False
-        
+        dlg = wx.TextEntryDialog(None, 'Escriba nombre','Nueva Lista', style=wx.OK|wx.CANCEL)
+        if dlg.ShowModal() == wx.ID_OK:
+            self.name=dlg.GetValue()
+            if self.name == '':
+                return False
+            aux = self.name.split(' ')
+            if len(aux)>1:
+                self.name=''
+                for i in aux:
+                    self.name = self.name + i + '_'
+                self.name = self.name[:-1]
+            dlg.Destroy()
+            return True
+        else:
+            return False
+            
 def saveCsv(csv, temps):
     cstring = "circulos_info"
     rstring = "circulos_full"
@@ -160,11 +163,11 @@ class MyFrame(wx.Frame):
         self.analizeCoord=[]
         self.currentImage=[]
         self.stream = True
-        self.analizing = True
         self.currentData=[]
         self.pointTemps=[]
         self.callibrating = False
         self.index = 0
+        self.editing=False
         self.image = wx.Image(640,480)
         self.conf=[]
         try:
@@ -227,8 +230,8 @@ class MyFrame(wx.Frame):
 
         self.lister = wx.ListCtrl(panel3, wx.ID_ANY, style=wx.LC_REPORT)
         self.lister.InsertColumn(0, 'circulo', wx.LIST_FORMAT_CENTRE)
-        self.lister.InsertColumn(1, 'max', wx.LIST_FORMAT_CENTRE)
-        self.lister.InsertColumn(2, 'mean', wx.LIST_FORMAT_CENTRE)
+        self.lister.InsertColumn(1, 'max(°C)', wx.LIST_FORMAT_CENTRE)
+        self.lister.InsertColumn(2, 'mean(°C)', wx.LIST_FORMAT_CENTRE)
         
 
         resBox.Add(self.lister,0,wx.EXPAND) 
@@ -267,20 +270,25 @@ class MyFrame(wx.Frame):
         # inputs y labels
         supInputBox = wx.BoxSizer(wx.HORIZONTAL)
         labelOne = wx.StaticText(panel4, wx.ID_ANY, '  superior')
-        self.umbralSupInput = wx.TextCtrl(panel4, wx.ID_ANY, '')
+        labelOne.SetFont(font)
+        self.sldsup = wx.Slider(panel4, value = 10, minValue = 0, maxValue = 100, style = wx.SL_HORIZONTAL|wx.SL_VALUE_LABEL)
+        # self.umbralSupInput = wx.TextCtrl(panel4, wx.ID_ANY, '')
 
-        supInputBox.Add(labelOne, 0, wx.ALL, 5)
-        supInputBox.Add(self.umbralSupInput, 1 , wx.ALL|wx.EXPAND, 5)
+        supInputBox.Add(labelOne, 0, wx.ALL|wx.ALIGN_BOTTOM, 5)
+        # supInputBox.Add(self.umbralSupInput, 1 , wx.ALL|wx.EXPAND, 5)
+        supInputBox.Add(self.sldsup, 1 , wx.ALL|wx.EXPAND|wx.ALIGN_BOTTOM, 0)
         
         infInputBox = wx.BoxSizer(wx.HORIZONTAL)
         labelTwo = wx.StaticText(panel4, wx.ID_ANY, '  inferior  ')
-        self.umbralInfInput = wx.TextCtrl(panel4, wx.ID_ANY, '')
+        labelTwo.SetFont(font)
+        self.sldinf = wx.Slider(panel4, value = 10, minValue = 0, maxValue = 100, style = wx.SL_HORIZONTAL|wx.SL_VALUE_LABEL)
+        # self.umbralInfInput = wx.TextCtrl(panel4, wx.ID_ANY, '')
 
-        infInputBox.Add(labelTwo, 0, wx.ALL, 5)
-        infInputBox.Add(self.umbralInfInput, 1 , wx.ALL|wx.EXPAND, 5)
+        infInputBox.Add(labelTwo, 0, wx.ALL|wx.ALIGN_BOTTOM, 5)
+        infInputBox.Add(self.sldinf, 1 , wx.ALL|wx.EXPAND, 0)
 
-        self.umbralSupInput.SetValue(str(self.conf[1]))
-        self.umbralInfInput.SetValue(str(self.conf[2]))
+        self.sldsup.SetValue(self.conf[1])
+        self.sldinf.SetValue(self.conf[2])
 
         
         # titulo calibracion
@@ -323,11 +331,14 @@ class MyFrame(wx.Frame):
 
         # botones para borrar y/o guardar la lista de circulos.
         lstCirSizer = wx.BoxSizer(wx.HORIZONTAL)
+        lstCirSizer2 = wx.BoxSizer(wx.HORIZONTAL)
+
         confSaveSizer = wx.BoxSizer(wx.HORIZONTAL)
         
         self.newButton = wx.Button(panel4, -1, "Nueva")
+        self.editButton = wx.Button(panel4, -1, "Editar")
         self.eraseButton = wx.Button(panel4, -1, "Borrar")
-        self.saveButton = wx.Button(panel4, -1, "Guardar/Cancelar Calibracion")
+        self.saveButton = wx.Button(panel4, -1, "Guardar")
         self.saveButton.Disable()
         confButton = wx.Button(panel4, -1, "Guardar Configuracion")
 
@@ -336,6 +347,9 @@ class MyFrame(wx.Frame):
 
         lstCirSizer.Add(self.newButton, 1, wx.ALL|wx.EXPAND, 5)
         lstCirSizer.Add(self.eraseButton, 1, wx.ALL|wx.EXPAND, 5)
+
+        lstCirSizer2.Add(self.editButton, 1, wx.ALL|wx.EXPAND, 5)
+        lstCirSizer2.Add(self.saveButton, 1, wx.ALL|wx.EXPAND, 5)
 
         # titulo automatico vs manual.
         automansizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -370,6 +384,19 @@ class MyFrame(wx.Frame):
         self.bInput.Disable()
         self.aInput.Disable()
 
+        # titulo mapeo colores
+        cmpsizer = wx.BoxSizer(wx.HORIZONTAL)
+        title = wx.StaticText(panel5, -1, '  Paleta de Colores')
+        title.SetFont(font)
+        cmpsizer.Add(title, 0, wx.ALL, 2)
+
+        # cmp: label y lister.
+        colors = ['gray', 'magma', 'hot', 'afmhot', 'copper', 'jet']
+        self.cmplst = wx.ComboBox(panel5, choices = colors , style = wx.CB_DROPDOWN|wx.CB_READONLY)
+        self.cmplst.SetSelection(0)
+
+
+
         # boxes para panel3
         boxMain.Add(restitsizer, 0, wx.ALL, 5)
         boxMain.Add(resBox, 0, wx.ALL|wx.EXPAND, 5)
@@ -388,7 +415,7 @@ class MyFrame(wx.Frame):
         boxConfigInit.Add(diamSizer, 0, wx.ALL, 2)
         boxConfigInit.Add(self.lst, 0, wx.ALL|wx.EXPAND, 2)
         boxConfigInit.Add(lstCirSizer, 0, wx.ALL|wx.EXPAND, 2)
-        boxConfigInit.Add(self.saveButton, 1, wx.ALL|wx.EXPAND, 7)
+        boxConfigInit.Add(lstCirSizer2, 0, wx.ALL|wx.EXPAND, 2)
         boxConfigInit.Add(wx.StaticLine(panel4,), 0, wx.ALL|wx.EXPAND, 5)
         boxConfigInit.AddStretchSpacer()
         boxConfigInit.Add(confSaveSizer, 0, wx.ALL|wx.EXPAND, 2)
@@ -402,6 +429,9 @@ class MyFrame(wx.Frame):
         boxNorm.Add(automanradsizer, 0, wx.ALL, 5)
         boxNorm.Add(abInputBox, 0, wx.ALL|wx.EXPAND, 5)
         boxNorm.Add(wx.StaticLine(panel5,), 0, wx.ALL|wx.EXPAND, 5)
+        boxNorm.Add(cmpsizer, 0, wx.ALL, 5)
+        boxNorm.Add(self.cmplst, 0, wx.ALL|wx.EXPAND, 5)
+        # boxNorm.Add(self.sld, 0, wx.EXPAND)
         
         panel5.SetSizer(boxNorm)
         
@@ -418,11 +448,40 @@ class MyFrame(wx.Frame):
         self.manrad.Bind(wx.EVT_RADIOBUTTON, self.radioButtonEvt)
         startButton.Bind(wx.EVT_BUTTON, self.analize)
         self.lst.Bind(wx.EVT_COMBOBOX_CLOSEUP, self.lstUpdate)
+        # self.cmplst.Bind(wx.EVT_COMBOBOX, self.cmp_update)
+        self.editButton.Bind(wx.EVT_BUTTON, self.on_edit_button)
 
         self.timer.Start(1000/8)
 
+    def on_edit_button(self, event):
+        if self.editButton.GetLabel()=='Editar':
+            self.editButton.SetLabel('Cancelar')
+            index=self.lst.GetCurrentSelection()
+            for i in self.confcoords[index]:
+                self.coordsSaved.append(i)
+            rawCoords=[]   
+            dlg = wx.MessageDialog(None, 'Use el click derecho para colocar un nuevo circulo. \nUse el click izquierdo para deshacer el ultimo circulo.', 'Instrucciones de calibración',wx.OK)
+            result = dlg.ShowModal()
+            if result == wx.ID_OK:
+                dlg.Destroy()
+                self.callibrating=True
+                self.saveButton.Enable()
+                self.lst.Disable()
+                self.eraseButton.Disable()
+                self.newButton.Disable()
+                self.editing=True
+        else:
+            self.editButton.SetLabel('Editar')
+            self.coordsSaved=[]
+            self.callibrating = False
+            self.saveButton.Disable()
+            self.lst.Enable()
+            self.eraseButton.Enable()
+            self.newButton.Enable()
+
     def lstUpdate(self, event):
         self.analizeCoord = []
+        self.lister.DeleteAllItems()
 
     def radioButtonEvt(self, event):
         a=event.GetEventObject().GetLabel()
@@ -443,15 +502,24 @@ class MyFrame(wx.Frame):
             self.lst.Enable()
             self.eraseButton.Enable()
             self.newButton.Enable()
+            if self.editButton.GetLabel()=='Cancelar':
+                self.editButton.SetLabel('Editar')
     
     def saveCircles(self, event):
         if len(self.coordsSaved)==0:
             print('gg')
         msg='Calibracion Cancelada'
         if saveCallibrationMsg(self):
-            self.confcoords.append(self.coordsSaved)
-            self.choices.append(self.name)
-            self.lst.Append(self.name)
+            anInt=-1
+            if self.editing:
+                index=self.lst.GetCurrentSelection()
+                self.confcoords[index] = self.coordsSaved
+                self.name=self.choices[index]
+                anInt = 5+index    
+            else:
+                self.confcoords.append(self.coordsSaved)
+                self.choices.append(self.name)
+                self.lst.Append(self.name)
 
             with open('conf.txt','r') as f:
                 data=f.readlines()
@@ -462,9 +530,17 @@ class MyFrame(wx.Frame):
                 s = s+str(i)
                 if i != self.coordsSaved[-1]:
                     s = s+'/'
-            data[-1] =data[-1]+'\n' 
-            data.append(s)
             
+            if anInt>0:
+                if data[-1]!=data[anInt]:
+                    s = s+'\n'
+                if data[anInt][0]!='*':
+                    data[anInt] = s
+                else:
+                    data[anInt] = '*'+s
+            else:
+                data[-1] =data[-1]+'\n' 
+                data.append(s)
             with open('conf.txt','w') as f:
                 f.writelines(data)
 
@@ -481,6 +557,8 @@ class MyFrame(wx.Frame):
         self.eraseButton.Enable()
         self.newButton.Enable()
         self.coordsSaved=[]
+        if self.editButton.GetLabel()=='Cancelar':
+                self.editButton.SetLabel('Editar')
 
     def on_open(self, event):
         dlg = wx.MessageDialog(None, 'Use el click derecho para colocar un nuevo circulo. \nUse el click izquierdo para deshacer el ultimo circulo.', 'Instrucciones de calibración',wx.OK)
@@ -493,7 +571,9 @@ class MyFrame(wx.Frame):
             self.lst.Disable()
             self.eraseButton.Disable()
             self.newButton.Disable()
-                
+            if self.editButton.GetLabel()=='Editar':
+                self.editButton.SetLabel('Cancelar')
+                 
     def getCoordinates(self, event):
         x, y=event.GetPosition()
         if self.callibrating:    
@@ -521,18 +601,19 @@ class MyFrame(wx.Frame):
             else:
                 ab = (self.aInput.GetValue(), self.bInput.GetValue())
                 img=[]
+                acmp = self.cmplst.GetStringSelection()
                 if self.autorad.GetValue():
-                    img = getImage2(self.currentData)
+                    img = getImage2(self.currentData, acmp)
                 else:
                     try:
                         ab = (int(ab[0]),int(ab[1]))
-                        img = getImage2(self.currentData, ab)
+                        img = getImage2(self.currentData, acmp, ab)
                     except:
-                        img = getImage2(self.currentData)
+                        img = getImage2(self.currentData, acmp)
                 
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 index=self.lst.GetCurrentSelection()
-                l=self.confcoords[index] 
+                l=self.confcoords[index]
                 if self.callibrating:
                     for i in range(len(self.coordsSaved)):
                         cv2.circle(img, self.coordsSaved[i], 15, (0,0,0), 3)
@@ -558,7 +639,7 @@ class MyFrame(wx.Frame):
         a=1
         if self.meanrad.GetValue():
             a=0
-        newConf = [str(a)+'\n',self.umbralSupInput.GetValue()+'\n',self.umbralInfInput.GetValue()+'\n']
+        newConf = [str(a)+'\n',str(self.sldsup.GetValue())+'\n',str(self.sldinf.GetValue())+'\n']
         if self.mrad.GetValue():
             newConf.append('1\n')
         else:
@@ -603,8 +684,8 @@ class MyFrame(wx.Frame):
             else:
                 value=np.max(temps)
 
-            sup = int(self.umbralSupInput.GetValue())
-            inf = int(self.umbralInfInput.GetValue())
+            sup = int(self.sldsup.GetValue())
+            inf = int(self.sldinf.GetValue())
 
             resp=None
             if value>sup:
@@ -653,7 +734,7 @@ if __name__ == "__main__":
             if len(frame_formats) == 0:
                 print("device does not support Y16")
                 exit(1)
-            print(frame_formats)
+            # print(frame_formats)
             libuvc.uvc_get_stream_ctrl_format_size(devh, byref(ctrl), UVC_FRAME_FORMAT_Y16, frame_formats[0].wWidth, frame_formats[0].wHeight, int(1e7 / frame_formats[0].dwDefaultFrameInterval))
             res = libuvc.uvc_start_streaming(devh, byref(ctrl), PTR_PY_FRAME_CALLBACK, None, 0)
             if res < 0:

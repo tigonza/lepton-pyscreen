@@ -208,8 +208,8 @@ def plot_examples(cms):
         fig.colorbar(psm, ax=ax)
     plt.show()
 
-def getCmpMod():
-    viridis = cm.get_cmap('jet', 256)
+def getCmpMod(cm):
+    viridis = cm.get_cmap(cm, 256)
     newcolors = viridis(np.linspace(0, 1, 256))
     pink = np.array([1, 0.7, 1, 1])
     newcolors[222:] = pink
@@ -239,9 +239,10 @@ def getPicture(path):
             rows.append(np.array(row))
     return np.array(rows)
 
-def getImage2(rows, ab=(0,0)):
-    m = getCmpMod()
+def getImage2(rows, colmp, ab=(0,0)):
+    m = cm.get_cmap(colmp, 256)
     rows=ktoc(rows)
     rows = cv2.resize(rows[:,:], (640, 480))
     im =norm(rows, ab[0], ab[1])*255
     return apply_custom_colormap(np.uint8(im), m)
+    # return np.uint8(im)
